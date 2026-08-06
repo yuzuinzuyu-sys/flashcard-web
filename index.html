@@ -23712,6 +23712,24 @@ function completionKey(date, mode) {
   return `flashcardComplete:${date}:${mode}`;
 }
 
+function progressKey(date, mode) {
+  return `flashcardProgress:${date}:${mode}`;
+}
+
+function readProgress(date, mode, max) {
+  const value = Number(localStorage.getItem(progressKey(date, mode)) || 0);
+  if (!Number.isFinite(value) || value < 0) return 0;
+  return Math.min(value, max);
+}
+
+function writeProgress(date, mode, index) {
+  localStorage.setItem(progressKey(date, mode), String(index));
+}
+
+function clearProgress(date, mode) {
+  localStorage.removeItem(progressKey(date, mode));
+}
+
 function statusKey(cardId) {
   return `flashcardStatus:${cardId}`;
 }
@@ -23785,7 +23803,9 @@ function setMode(mode, silent = false) {
   document.querySelectorAll('.toolbar button').forEach(button => button.classList.remove('active'));
   document.getElementById(`mode-${mode}`).classList.add('active');
   activeCards = filteredCards();
-  currentCardIndex = 0;
+  currentCardIndex = currentMode === 'review'
+    ? 0
+    : readProgress(todayData.date, currentMode, activeCards.length);
   flipped = false;
   stats = { know: 0, unsure: 0, unknown: 0 };
   document.querySelector('.card-container').style.display = 'block';
@@ -23852,6 +23872,9 @@ function markCard(status) {
   writeStatus(card, status);
   stats[status]++;
   currentCardIndex++;
+  if (currentMode !== 'review') {
+    writeProgress(todayData.date, currentMode, currentCardIndex);
+  }
   updateTotalStats();
   showCard();
 }
@@ -23861,6 +23884,7 @@ function showSummary() {
   document.getElementById('buttons').style.display = 'none';
   if (currentMode !== 'review') {
     localStorage.setItem(completionKey(todayData.date, currentMode), '1');
+    clearProgress(todayData.date, currentMode);
   }
   if (currentMode === 'core') {
     localStorage.setItem(completionKey(todayData.date, 'core'), '1');
@@ -23894,6 +23918,9 @@ function updateTotalStats() {
 
 function restartCards() {
   currentCardIndex = 0;
+  if (currentMode !== 'review') {
+    clearProgress(todayData.date, currentMode);
+  }
   stats = { know: 0, unsure: 0, unknown: 0 };
   document.querySelector('.card-container').style.display = 'block';
   document.getElementById('summary').classList.remove('show');
