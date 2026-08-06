@@ -8,15 +8,16 @@
 <title>学习闪卡 · 15天冲刺</title>
 <style>
   :root {
-    --bg: #0a0a0a;
-    --card-bg: #1a1a1a;
-    --text: #e8e8e8;
-    --text-dim: #999;
-    --accent: #4a9eff;
-    --green: #4ade80;
-    --yellow: #fbbf24;
-    --red: #f87171;
-    --border: #333;
+    --bg: #f6f7fb;
+    --card-bg: #ffffff;
+    --text: #172033;
+    --text-dim: #667085;
+    --accent: #2563eb;
+    --green: #2f9e44;
+    --yellow: #b7791f;
+    --red: #d64545;
+    --border: #d9dee8;
+    --soft: #eef2ff;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -52,7 +53,7 @@
     width: 100%;
     max-width: 560px;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 8px;
     margin-bottom: 14px;
   }
@@ -60,7 +61,7 @@
     padding: 11px 10px;
     border: 1px solid var(--border);
     border-radius: 10px;
-    background: #111;
+    background: #fff;
     color: var(--text);
     font-size: 0.86rem;
     font-weight: 600;
@@ -69,7 +70,29 @@
   .toolbar button.active {
     background: var(--accent);
     border-color: var(--accent);
-    color: #000;
+    color: #fff;
+  }
+  .quick-stats {
+    width: 100%;
+    max-width: 560px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .quick-stat {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px;
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+  }
+  .quick-stat strong {
+    display: block;
+    color: var(--text);
+    font-size: 1rem;
   }
   .card-container {
     width: 100%;
@@ -109,7 +132,7 @@
     font-size: 0.68rem;
     font-weight: 700;
     color: var(--green);
-    background: rgba(74, 222, 128, 0.14);
+    background: #eaf7ee;
     padding: 4px 10px;
     border-radius: 20px;
     text-transform: uppercase;
@@ -133,7 +156,7 @@
   .option {
     padding: 8px 0;
     color: var(--text-dim);
-    border-bottom: 1px solid rgba(255,255,255,0.04);
+    border-bottom: 1px solid #eef1f5;
   }
   .answer {
     display: none;
@@ -173,8 +196,8 @@
     cursor: pointer;
   }
   button:active { opacity: 0.72; }
-  .btn-know { background: var(--green); color: #000; }
-  .btn-unsure { background: var(--yellow); color: #000; }
+  .btn-know { background: #b7efc5; color: #12351d; }
+  .btn-unsure { background: #fde68a; color: #4a3412; }
   .btn-unknown { background: var(--red); color: #fff; }
   .summary {
     width: 100%;
@@ -202,7 +225,12 @@
   .restart {
     margin-top: 20px;
     background: var(--accent);
-    color: #000;
+    color: #fff;
+  }
+  @media (max-width: 430px) {
+    body { padding: 14px; }
+    .toolbar { grid-template-columns: repeat(2, 1fr); }
+    .card { min-height: 340px; padding: 34px 18px 22px; }
   }
 </style>
 </head>
@@ -218,6 +246,13 @@
     <button id="mode-core" onclick="setMode('core')">Core 50</button>
     <button id="mode-extra" onclick="setMode('extra')">Extra 50</button>
     <button id="mode-all" onclick="setMode('all')">全部 100</button>
+    <button id="mode-review" onclick="setMode('review')">模糊/不会</button>
+  </div>
+
+  <div class="quick-stats">
+    <div class="quick-stat"><strong id="totalKnow">0</strong>已掌握</div>
+    <div class="quick-stat"><strong id="totalUnsure">0</strong>模糊</div>
+    <div class="quick-stat"><strong id="totalUnknown">0</strong>不会</div>
   </div>
 
   <div class="card-container">
@@ -23677,6 +23712,32 @@ function completionKey(date, mode) {
   return `flashcardComplete:${date}:${mode}`;
 }
 
+function statusKey(cardId) {
+  return `flashcardStatus:${cardId}`;
+}
+
+function readStatus(cardId) {
+  const raw = localStorage.getItem(statusKey(cardId));
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function writeStatus(card, status) {
+  localStorage.setItem(statusKey(card.id), JSON.stringify({
+    status,
+    cardId: card.id,
+    date: todayData.date,
+    mode: currentMode,
+    course: card.course,
+    theme: card.theme,
+    updatedAt: new Date().toISOString()
+  }));
+}
+
 function isComplete(date, mode = 'core') {
   return localStorage.getItem(completionKey(date, mode)) === '1';
 }
@@ -23695,6 +23756,14 @@ function getStudyData() {
 }
 
 function filteredCards() {
+  if (currentMode === 'review') {
+    return Object.values(FLASHCARDS)
+      .flatMap(day => day.cards)
+      .filter(card => {
+        const record = readStatus(card.id);
+        return record && (record.status === 'unsure' || record.status === 'unknown');
+      });
+  }
   if (currentMode === 'all') return todayData.cards;
   return todayData.cards.filter(card => card.tier === currentMode);
 }
@@ -23706,6 +23775,7 @@ function init() {
   }
   document.getElementById('title').textContent = todayData.title;
   document.getElementById('date').textContent = todayData.date;
+  updateTotalStats();
   setMode(currentMode, true);
 }
 
@@ -23720,6 +23790,7 @@ function setMode(mode, silent = false) {
   stats = { know: 0, unsure: 0, unknown: 0 };
   document.querySelector('.card-container').style.display = 'block';
   document.getElementById('summary').classList.remove('show');
+  updateTotalStats();
   showCard();
 }
 
@@ -23735,7 +23806,9 @@ function showCard() {
   document.getElementById('progress').textContent =
     `卡片 ${currentCardIndex + 1} / ${activeCards.length}`;
   document.getElementById('modeNote').textContent =
-    todayData.date < todayISO() ? '正在补最早未完成的学习日' : '今日学习';
+    currentMode === 'review'
+      ? '复习本机记录里的模糊/不会'
+      : (todayData.date < todayISO() ? '正在补最早未完成的学习日' : '今日学习');
   document.getElementById('cardType').textContent = card.type;
   document.getElementById('tierTag').textContent = card.tier;
   document.getElementById('meta').textContent =
@@ -23775,15 +23848,20 @@ function flipCard() {
 }
 
 function markCard(status) {
+  const card = activeCards[currentCardIndex];
+  writeStatus(card, status);
   stats[status]++;
   currentCardIndex++;
+  updateTotalStats();
   showCard();
 }
 
 function showSummary() {
   document.querySelector('.card-container').style.display = 'none';
   document.getElementById('buttons').style.display = 'none';
-  localStorage.setItem(completionKey(todayData.date, currentMode), '1');
+  if (currentMode !== 'review') {
+    localStorage.setItem(completionKey(todayData.date, currentMode), '1');
+  }
   if (currentMode === 'core') {
     localStorage.setItem(completionKey(todayData.date, 'core'), '1');
   }
@@ -23791,12 +23869,27 @@ function showSummary() {
   const summary = document.getElementById('summary');
   summary.classList.add('show');
   document.getElementById('summaryTitle').textContent =
-    `${todayData.date} · ${currentMode.toUpperCase()} 完成`;
+    activeCards.length === 0
+      ? (currentMode === 'review' ? '暂无模糊/不会卡片' : '当前没有卡片')
+      : `${todayData.date} · ${currentMode.toUpperCase()} 完成`;
   document.getElementById('knowCount').textContent = stats.know;
   document.getElementById('unsureCount').textContent = stats.unsure;
   document.getElementById('unknownCount').textContent = stats.unknown;
 
   todayData = getStudyData();
+}
+
+function updateTotalStats() {
+  const totals = { know: 0, unsure: 0, unknown: 0 };
+  Object.values(FLASHCARDS).flatMap(day => day.cards).forEach(card => {
+    const record = readStatus(card.id);
+    if (record && totals[record.status] !== undefined) {
+      totals[record.status]++;
+    }
+  });
+  document.getElementById('totalKnow').textContent = totals.know;
+  document.getElementById('totalUnsure').textContent = totals.unsure;
+  document.getElementById('totalUnknown').textContent = totals.unknown;
 }
 
 function restartCards() {
